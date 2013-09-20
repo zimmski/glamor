@@ -105,7 +105,7 @@ func main() {
 	if _, err := mail.ParseAddress(flagSMTPFrom); err != nil {
 		panic("smtp-from is not a valid mail address")
 	} else if _, err := mail.ParseAddress(flagSMTPTo); err != nil {
-		panic("smtp-from is not a valid mail address")
+		panic("smtp-to is not a valid mail address")
 	}
 
 	sig := make(chan os.Signal, 1)
