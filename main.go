@@ -76,7 +76,6 @@ func v(format string, a ...interface{}) {
 }
 
 func main() {
-
 	flag.BoolVar(&flagHelp, "help", false, "Show this help")
 	flag.StringVar(&flagHost, "host", "", "The host to ping")
 	flag.Int64Var(&flagInterval, "interval", 60, "Ping interval in seconds")
@@ -113,7 +112,7 @@ func main() {
 
 	go func() {
 		s := <-sig
-		v("Catched signal \"%v\", will exit now\n", s)
+		v("Caught signal \"%v\", will exit now\n", s)
 
 		os.Exit(0)
 	}()
