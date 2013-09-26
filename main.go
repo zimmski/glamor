@@ -6,6 +6,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"net/mail"
@@ -26,6 +27,7 @@ var flagInterval int64
 var flagMaxErrors int64
 var flagSMTP string
 var flagSMTPFrom string
+var flagSMTPSkipCertificateVerify bool
 var flagSMTPTLS bool
 var flagSMTPTo string
 var flagVerbose bool
@@ -41,6 +43,16 @@ func sendMail() {
 		v("Cannot open SMTP connection: %v\n", err)
 
 		return
+	}
+
+	if flagSMTPTLS {
+		err := c.StartTLS(&tls.Config{InsecureSkipVerify: flagSMTPSkipCertificateVerify})
+
+		if err != nil {
+			v("Cannot start SMTP TLS: %v\n", err)
+
+			return
+		}
 	}
 
 	c.Mail(flagSMTPFrom)
@@ -86,6 +98,7 @@ func main() {
 	flag.Int64Var(&flagMaxErrors, "max-errors", 5, "How many pings can fail before a report is sent")
 	flag.StringVar(&flagSMTP, "smtp", "", "The SMTP server + port for sending report mails")
 	flag.StringVar(&flagSMTPFrom, "smtp-from", "", "From-mail address")
+	flag.BoolVar(&flagSMTPSkipCertificateVerify, "smtp-skip-certificate-verify", false, "Do not verify the SMTP certificate")
 	flag.BoolVar(&flagSMTPTLS, "smtp-tls", false, "Use TLS for the SMTP connection")
 	flag.StringVar(&flagSMTPTo, "smtp-to", "", "To-mail address")
 	flag.BoolVar(&flagVerbose, "verbose", false, "Do verbose output")
