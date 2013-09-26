@@ -97,7 +97,7 @@ func main() {
 	flag.StringVar(&flagHost, "host", "", "The host to ping")
 	flag.Int64Var(&flagInterval, "interval", 60, "Ping interval in seconds")
 	flag.Int64Var(&flagMaxErrors, "max-errors", 5, "How many pings can fail before a report is sent")
-	flag.Int64Var(&flagResetHostDown, "reset-host-down", 50, "How many pings have to be successful to reset the host down status")
+	flag.Int64Var(&flagResetHostDown, "reset-host-down", 50, "How many pings have to be successful in order to reset the host down status")
 	flag.StringVar(&flagSMTP, "smtp", "", "The SMTP server + port for sending report mails")
 	flag.StringVar(&flagSMTPFrom, "smtp-from", "", "From-mail address")
 	flag.BoolVar(&flagSMTPSkipCertificateVerify, "smtp-skip-certificate-verify", false, "Do not verify the SMTP certificate")
