@@ -101,9 +101,9 @@ func main() {
 		}
 	}
 
-	if _, err := mail.ParseAddress(flagSMTPFrom); err != nil {
+	if _, err := mail.ParseAddress(flagSMTPFrom); flagSMTPFrom != "" && err != nil {
 		panic("smtp-from is not a valid mail address")
-	} else if _, err := mail.ParseAddress(flagSMTPTo); err != nil {
+	} else if _, err := mail.ParseAddress(flagSMTPTo); flagSMTPFrom != "" && err != nil {
 		panic("smtp-to is not a valid mail address")
 	}
 
