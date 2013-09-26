@@ -25,6 +25,7 @@ var flagHelp bool
 var flagHost string
 var flagInterval int64
 var flagMaxErrors int64
+var flagResetHostDown int64
 var flagSMTP string
 var flagSMTPFrom string
 var flagSMTPSkipCertificateVerify bool
@@ -96,6 +97,7 @@ func main() {
 	flag.StringVar(&flagHost, "host", "", "The host to ping")
 	flag.Int64Var(&flagInterval, "interval", 60, "Ping interval in seconds")
 	flag.Int64Var(&flagMaxErrors, "max-errors", 5, "How many pings can fail before a report is sent")
+	flag.Int64Var(&flagResetHostDown, "reset-host-down", 50, "How many pings have to be successful to reset the host down status")
 	flag.StringVar(&flagSMTP, "smtp", "", "The SMTP server + port for sending report mails")
 	flag.StringVar(&flagSMTPFrom, "smtp-from", "", "From-mail address")
 	flag.BoolVar(&flagSMTPSkipCertificateVerify, "smtp-skip-certificate-verify", false, "Do not verify the SMTP certificate")
@@ -105,7 +107,7 @@ func main() {
 
 	flag.Parse()
 
-	if flagHost == "" || flagInterval <= 0 || flagMaxErrors <= 0 || flagHelp {
+	if flagHost == "" || flagInterval <= 0 || flagMaxErrors <= 0 || flagResetHostDown <= 0 || flagHelp {
 		fmt.Printf("glamor v%s\n", Version)
 		fmt.Printf("usage:\n")
 		fmt.Printf("\t%s -host <host> -interval <interval>\n", os.Args[0])
@@ -149,7 +151,7 @@ func main() {
 		if strings.Contains(string(out), "1 received") {
 			errors--
 
-			if sentMail && errors < 100 {
+			if sentMail && errors <= flagResetHostDown {
 				errors = 0
 				sentMail = false
 
