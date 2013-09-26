@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const Version = "0.1"
+const Version = "1.0"
 
 var flagHelp bool
 var flagHost string
