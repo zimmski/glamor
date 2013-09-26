@@ -132,7 +132,7 @@ func main() {
 		if strings.Contains(string(out), "1 received") {
 			errors--
 
-			if errors < 100 {
+			if sentMail && errors < 100 {
 				errors = 0
 				sentMail = false
 
