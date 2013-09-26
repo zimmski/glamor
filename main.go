@@ -121,7 +121,7 @@ func main() {
 	var errors int64 = 0
 
 	for {
-		var cmd = exec.Command("ping", []string{"-c", "1", flagHost}...)
+		var cmd = exec.Command("ping", []string{"-w", "1", "-c", "1", flagHost}...)
 
 		out, err := cmd.CombinedOutput()
 
