@@ -146,7 +146,11 @@ func main() {
 		if strings.Contains(string(out), "1 received") {
 			errors--
 
-			if sentMail && errors <= opts.ResetHostDown {
+			if opts.SMTP != "" && sentMail && errors <= opts.ResetHostDown {
+				if err := sendMail(opts.Host+" is up", opts.Host+" is reachable again via ping"); err != nil {
+					v("Cannot send mail: %v", err)
+				}
+
 				errors = 0
 				sentMail = false
 			}
@@ -158,9 +162,9 @@ func main() {
 
 				v("reached error count")
 
-				if !sentMail {
+				if opts.SMTP != "" && !sentMail {
 					if err := sendMail(opts.Host+" is down", opts.Host+" is not reachable via ping"); err != nil {
-						v("Cannot send mail %v", err)
+						v("Cannot send mail: %v", err)
 					}
 
 					sentMail = true
