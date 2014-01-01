@@ -58,10 +58,10 @@ Some example arguments for Glamor:
   <pre><code>glamor --host github.com --verbose --interval 1</code></pre>
 
 * Monitor github.com and send a mail if it is down
-  <pre><code>glamor --host google.com --smtp localhost:25 --smtp-from monitoring@fake.domain --smtp-to guard@fake.domain</code></pre>
+  <pre><code>glamor --host github.com --smtp localhost:25 --smtp-from monitoring@fake.domain --smtp-to guard@fake.domain</code></pre>
 
 * Monitor github.com and send a mail via TLS connection but ignore “invalid” certificates
-  <pre><code>glamor --host google.com --smtp localhost:25 --smtp-from monitoring@fake.domain --smtp-to guard@fake.domain --smtp-tls --smtp-skip-certificate-verify</code></pre>
+  <pre><code>glamor --host github.com --smtp localhost:25 --smtp-from monitoring@fake.domain --smtp-to guard@fake.domain --smtp-tls --smtp-skip-certificate-verify</code></pre>
 
 ## Can I make some feature requests?
 
