@@ -7,7 +7,6 @@ package main
 import (
 	"bytes"
 	"crypto/tls"
-	"flag"
 	"fmt"
 	"net/mail"
 	"net/smtp"
@@ -17,50 +16,77 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/jessevdk/go-flags"
 )
 
-const Version = "1.0"
+const version = "1.0"
 
-var flagHelp bool
-var flagHost string
-var flagInterval int64
-var flagMaxErrors int64
-var flagResetHostDown int64
-var flagSMTP string
-var flagSMTPFrom string
-var flagSMTPSkipCertificateVerify bool
-var flagSMTPTLS bool
-var flagSMTPTo string
-var flagVerbose bool
+const (
+	returnOk = iota
+	returnHelp
+)
+
+var opts struct {
+	Host                      string `long:"host" description:"The host to ping" required:"true"`
+	Interval                  uint64 `long:"interval" default:"60" description:"Ping interval in seconds"`
+	MaxErrors                 uint64 `long:"max-errors" default:"5" description:"How many pings can fail before a report is sent"`
+	ResetHostDown             uint64 `long:"reset-host-down" default:"20" description:"How many pings have to be successful in order to reset the host down status"`
+	SMTP                      string `long:"smtp" description:"The SMTP server + port for sending report mails"`
+	SMTPFrom                  string `long:"smtp-from" description:"From-mail address"`
+	SMTPSkipCertificateVerify bool   `long:"smtp-skip-certificate-verify" description:"Do not verify the SMTP certificate"`
+	SMTPTLS                   bool   `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
+	SMTPTo                    string `long:"smtp-to" description:"To-mail address"`
+	Verbose                   bool   `long:"verbose" description:"Do verbose output"`
+}
+
+func checkArguments() {
+	p := flags.NewNamedParser("glamor", flags.HelpFlag)
+	p.ShortDescription = "A daemon for monitoring hosts via ICMP echo request (ping)"
+	p.AddGroup("Glamor arguments", "", &opts)
+
+	if _, err := p.ParseArgs(os.Args); err != nil {
+		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
+			panic(err)
+		} else {
+			fmt.Printf("%+v\n", opts)
+			p.WriteHelp(os.Stdout)
+
+			os.Exit(returnHelp)
+		}
+	}
+
+	if _, err := mail.ParseAddress(opts.SMTPFrom); opts.SMTPFrom != "" && err != nil {
+		panic("smtp-from is not a valid mail address")
+	} else if _, err := mail.ParseAddress(opts.SMTPTo); opts.SMTPFrom != "" && err != nil {
+		panic("smtp-to is not a valid mail address")
+	}
+}
 
 func sendMail() {
-	if flagSMTP == "" {
+	if opts.SMTP == "" {
 		return
 	}
 
-	c, err := smtp.Dial(flagSMTP)
-
+	c, err := smtp.Dial(opts.SMTP)
 	if err != nil {
 		v("Cannot open SMTP connection: %v\n", err)
 
 		return
 	}
 
-	if flagSMTPTLS {
-		err := c.StartTLS(&tls.Config{InsecureSkipVerify: flagSMTPSkipCertificateVerify})
-
-		if err != nil {
+	if opts.SMTPTLS {
+		if err := c.StartTLS(&tls.Config{InsecureSkipVerify: opts.SMTPSkipCertificateVerify}); err != nil {
 			v("Cannot start SMTP TLS: %v\n", err)
 
 			return
 		}
 	}
 
-	c.Mail(flagSMTPFrom)
-	c.Rcpt(flagSMTPTo)
+	c.Mail(opts.SMTPFrom)
+	c.Rcpt(opts.SMTPTo)
 
 	wc, err := c.Data()
-
 	if err != nil {
 		v("Cannot open Data writer: %v\n", err)
 
@@ -69,14 +95,14 @@ func sendMail() {
 
 	defer wc.Close()
 
-	buf := bytes.NewBufferString(`Return-path: <` + flagSMTPFrom + `>
-From: ` + flagSMTPFrom + `
-To: ` + flagSMTPTo + `
-Subject: ` + flagHost + ` is down
+	buf := bytes.NewBufferString(`Return-path: <` + opts.SMTPFrom + `>
+From: ` + opts.SMTPFrom + `
+To: ` + opts.SMTPTo + `
+Subject: ` + opts.Host + ` is down
 Content-Transfer-Encoding: 7Bit
 Content-Type: text/plain; charset="us-ascii"
 
-` + flagHost + ` is not reachable via ping
+` + opts.Host + ` is not reachable via ping
 `)
 
 	if _, err = buf.WriteTo(wc); err != nil {
@@ -87,44 +113,13 @@ Content-Type: text/plain; charset="us-ascii"
 }
 
 func v(format string, a ...interface{}) {
-	if flagVerbose {
+	if opts.Verbose {
 		fmt.Fprintf(os.Stderr, format, a...)
 	}
 }
 
 func main() {
-	flag.BoolVar(&flagHelp, "help", false, "Show this help")
-	flag.StringVar(&flagHost, "host", "", "The host to ping")
-	flag.Int64Var(&flagInterval, "interval", 60, "Ping interval in seconds")
-	flag.Int64Var(&flagMaxErrors, "max-errors", 5, "How many pings can fail before a report is sent")
-	flag.Int64Var(&flagResetHostDown, "reset-host-down", 50, "How many pings have to be successful in order to reset the host down status")
-	flag.StringVar(&flagSMTP, "smtp", "", "The SMTP server + port for sending report mails")
-	flag.StringVar(&flagSMTPFrom, "smtp-from", "", "From-mail address")
-	flag.BoolVar(&flagSMTPSkipCertificateVerify, "smtp-skip-certificate-verify", false, "Do not verify the SMTP certificate")
-	flag.BoolVar(&flagSMTPTLS, "smtp-tls", false, "Use TLS for the SMTP connection")
-	flag.StringVar(&flagSMTPTo, "smtp-to", "", "To-mail address")
-	flag.BoolVar(&flagVerbose, "verbose", false, "Do verbose output")
-
-	flag.Parse()
-
-	if flagHost == "" || flagInterval <= 0 || flagMaxErrors <= 0 || flagResetHostDown <= 0 || flagHelp {
-		fmt.Printf("glamor v%s\n", Version)
-		fmt.Printf("usage:\n")
-		fmt.Printf("\t%s -host <host> -interval <interval>\n", os.Args[0])
-		fmt.Printf("options\n")
-		flag.PrintDefaults()
-		fmt.Printf("\n")
-
-		if !flagHelp {
-			panic("Wrong arguments")
-		}
-	}
-
-	if _, err := mail.ParseAddress(flagSMTPFrom); flagSMTPFrom != "" && err != nil {
-		panic("smtp-from is not a valid mail address")
-	} else if _, err := mail.ParseAddress(flagSMTPTo); flagSMTPFrom != "" && err != nil {
-		panic("smtp-to is not a valid mail address")
-	}
+	checkArguments()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
@@ -133,34 +128,33 @@ func main() {
 		s := <-sig
 		v("Caught signal \"%v\", will exit now\n", s)
 
-		os.Exit(0)
+		os.Exit(returnOk)
 	}()
 
 	var sentMail = false
-	var errors int64 = 0
+	var errors uint64
 
 	for {
-		var cmd = exec.Command("ping", []string{"-w", "1", "-c", "1", flagHost}...)
+		var cmd = exec.Command("ping", []string{"-w", "1", "-c", "1", opts.Host}...)
 
 		out, err := cmd.CombinedOutput()
-
 		if err != nil {
-			v("Ping failed to %s: %v\n", flagHost, err)
+			v("Ping to %s failed: %v\n", opts.Host, err)
 		}
 
 		if strings.Contains(string(out), "1 received") {
 			errors--
 
-			if sentMail && errors <= flagResetHostDown {
+			if sentMail && errors <= opts.ResetHostDown {
 				errors = 0
 				sentMail = false
 
-				v("Reset mail sent flag\n")
+				v("Reset mail sent opts.\n")
 			}
 		} else {
 			errors++
 
-			if errors >= flagMaxErrors {
+			if errors >= opts.MaxErrors {
 				errors = 0
 
 				v("Reached error count\n")
@@ -173,8 +167,6 @@ func main() {
 			}
 		}
 
-		time.Sleep(time.Duration(flagInterval) * time.Second)
+		time.Sleep(time.Duration(opts.Interval) * time.Second)
 	}
-
-	return
 }
