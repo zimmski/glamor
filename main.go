@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,18 +34,25 @@ const (
 	statusDown
 )
 
+type host struct {
+	name   string
+	status byte
+	down   uint64
+	up     uint64
+}
+
 var opts struct {
-	Host                      string `long:"host" description:"The host to ping" required:"true"`
-	Interval                  uint64 `long:"interval" default:"60" description:"Ping interval in seconds"`
-	MaxErrors                 uint64 `long:"max-errors" default:"5" description:"How many pings can fail before a report is sent"`
-	ResetHostDown             uint64 `long:"reset-host-down" default:"20" description:"How many pings have to be successful in order to reset the host down status"`
-	SMTP                      string `long:"smtp" description:"The SMTP server + port for sending report mails"`
-	SMTPFrom                  string `long:"smtp-from" description:"From-mail address"`
-	SMTPSkipCertificateVerify bool   `long:"smtp-skip-certificate-verify" description:"Do not verify the SMTP certificate"`
-	SMTPTLS                   bool   `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
-	SMTPTo                    string `long:"smtp-to" description:"To-mail address"`
-	Verbose                   bool   `long:"verbose" description:"Do verbose output"`
-	Version                   bool   `long:"version" description:"Print the version of this program"`
+	Host                      []string `long:"host" description:"A host to ping" required:"true"`
+	Interval                  uint64   `long:"interval" default:"60" description:"Ping interval in seconds"`
+	MaxDown                   uint64   `long:"max-down" default:"5" description:"How many pings must fail (in a row) before the host status is down"`
+	MaxUp                     uint64   `long:"max-up" default:"20" description:"How many pings must succeed (in a row) before the host status is up again"`
+	SMTP                      string   `long:"smtp" description:"The SMTP server + port for sending report mails"`
+	SMTPFrom                  string   `long:"smtp-from" description:"From-mail address"`
+	SMTPSkipCertificateVerify bool     `long:"smtp-skip-certificate-verify" description:"Do not verify the SMTP certificate"`
+	SMTPTLS                   bool     `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
+	SMTPTo                    []string `long:"smtp-to" description:"A To-mail address"`
+	Verbose                   bool     `long:"verbose" description:"Do verbose output"`
+	Version                   bool     `long:"version" description:"Print the version of this program"`
 }
 
 func checkArguments() {
@@ -70,16 +78,79 @@ func checkArguments() {
 
 	if opts.Interval < 1 {
 		panic("interval must be at least 1")
-	} else if opts.MaxErrors < 1 {
-		panic("max-errors must be at least 1")
-	} else if opts.ResetHostDown < 1 {
-		panic("reset-host-down must be at least 1")
+	} else if opts.MaxDown < 1 {
+		panic("max-down must be at least 1")
+	} else if opts.MaxUp < 1 {
+		panic("max-up must be at least 1")
 	}
 
 	if _, err := mail.ParseAddress(opts.SMTPFrom); opts.SMTPFrom != "" && err != nil {
 		panic("smtp-from is not a valid mail address")
-	} else if _, err := mail.ParseAddress(opts.SMTPTo); opts.SMTPFrom != "" && err != nil {
-		panic("smtp-to is not a valid mail address")
+	}
+
+	for _, m := range opts.SMTPTo {
+		if _, err := mail.ParseAddress(m); m == "" || err != nil {
+			panic(fmt.Sprintf("smtp-to \"%s\" is not a valid mail address", m))
+		}
+	}
+}
+
+func checkHost(wg *sync.WaitGroup, host *host) {
+	defer wg.Done()
+
+	var cmd = exec.Command("ping", "-w", "1", "-c", "1", host.name)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		v("ping to %s failed: %v", host.name, err)
+	}
+
+	if strings.Contains(string(out), "1 received") {
+		if host.status == statusDown {
+			host.up++
+
+			if host.up >= opts.MaxUp {
+				host.down = 0
+				host.up = 0
+
+				host.status = statusUp
+
+				subject := fmt.Sprintf("host %s is up", host.name)
+
+				v(subject)
+
+				if opts.SMTP != "" {
+					if err := sendMail(subject, host.name+" is reachable again via ping"); err != nil {
+						v("Cannot send mail: %v", err)
+					}
+				}
+			}
+		} else {
+			host.down = 0
+		}
+	} else {
+		host.down++
+
+		if host.status == statusUp {
+			if host.down >= opts.MaxDown {
+				host.down = 0
+				host.up = 0
+
+				host.status = statusDown
+
+				subject := fmt.Sprintf("host %s is down", host.name)
+
+				v(subject)
+
+				if opts.SMTP != "" {
+					if err := sendMail(subject, host.name+" is not reachable via ping"); err != nil {
+						v("Cannot send mail: %v", err)
+					}
+				}
+			}
+		} else {
+			host.up = 0
+		}
 	}
 }
 
@@ -100,7 +171,9 @@ func sendMail(subject string, message string) error {
 	}
 
 	c.Mail(opts.SMTPFrom)
-	c.Rcpt(opts.SMTPTo)
+	for _, m := range opts.SMTPTo {
+		c.Rcpt(m)
+	}
 
 	wc, err := c.Data()
 	if err != nil {
@@ -111,7 +184,7 @@ func sendMail(subject string, message string) error {
 
 	buf := bytes.NewBufferString(`Return-path: <` + opts.SMTPFrom + `>
 From: ` + opts.SMTPFrom + `
-To: ` + opts.SMTPTo + `
+To: ` + strings.Join(opts.SMTPTo, ", ") + `
 Subject: ` + subject + `
 Content-Transfer-Encoding: 7Bit
 Content-Type: text/plain; charset="us-ascii"
@@ -145,61 +218,23 @@ func main() {
 		os.Exit(returnSignal)
 	}()
 
-	var status byte
-	var down uint64
-	var up uint64
+	hosts := make([]host, len(opts.Host))
+
+	for i, name := range opts.Host {
+		hosts[i].name = name
+		hosts[i].status = statusUp
+	}
+
+	var wg sync.WaitGroup
 
 	for {
-		var cmd = exec.Command("ping", "-w", "1", "-c", "1", opts.Host)
+		for i := range hosts {
+			wg.Add(1)
 
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			v("ping to %s failed: %v", opts.Host, err)
+			go checkHost(&wg, &hosts[i])
 		}
 
-		if strings.Contains(string(out), "1 received") {
-			if status == statusDown {
-				up++
-
-				if up >= opts.ResetHostDown {
-					down = 0
-					up = 0
-
-					status = statusUp
-
-					v("host is up")
-
-					if opts.SMTP != "" {
-						if err := sendMail(opts.Host+" is up", opts.Host+" is reachable again via ping"); err != nil {
-							v("Cannot send mail: %v", err)
-						}
-					}
-				}
-			} else {
-				down = 0
-			}
-		} else {
-			down++
-
-			if status == statusUp {
-				if down >= opts.MaxErrors {
-					down = 0
-					up = 0
-
-					status = statusDown
-
-					v("host is down")
-
-					if opts.SMTP != "" {
-						if err := sendMail(opts.Host+" is down", opts.Host+" is not reachable via ping"); err != nil {
-							v("Cannot send mail: %v", err)
-						}
-					}
-				}
-			} else {
-				up = 0
-			}
-		}
+		wg.Wait()
 
 		time.Sleep(time.Duration(opts.Interval) * time.Second)
 	}

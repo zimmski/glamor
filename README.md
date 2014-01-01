@@ -29,15 +29,15 @@ go install github.com/zimmski/glamor
 The following CLI arguments can be used:
 
 ```
-      --host=                         The host to ping
+      --host=                         A host to ping
       --interval=                     Ping interval in seconds (60)
-      --max-errors=                   How many pings can fail before a report is sent (5)
-      --reset-host-down=              How many pings have to be successful in order to reset the host down status (20)
+      --max-down=                     How many pings must fail (in a row) before the host status is down (5)
+      --max-up=                       How many pings must succeed (in a row) before the host status is up again (20)
       --smtp=                         The SMTP server + port for sending report mails
       --smtp-from=                    From-mail address
       --smtp-skip-certificate-verify  Do not verify the SMTP certificate
       --smtp-tls                      Use TLS for the SMTP connection
-      --smtp-to=                      To-mail address
+      --smtp-to=                      A To-mail address
       --verbose                       Do verbose output
       --version                       Print the version of this program
 
@@ -50,6 +50,9 @@ Some example arguments for Glamor:
 
 * Monitor github.com with verbose output
   <pre><code>glamor --host github.com --verbose</code></pre>
+
+* Monitor github.com and google.com
+  <pre><code>glamor --host github.com --host google.com</code></pre>
 
 * Monitor github.com every second with verbose output
   <pre><code>glamor --host github.com --verbose --interval 1</code></pre>
