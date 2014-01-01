@@ -68,6 +68,14 @@ func checkArguments() {
 		}
 	}
 
+	if opts.Interval < 1 {
+		panic("interval must be at least 1")
+	} else if opts.MaxErrors < 1 {
+		panic("max-errors must be at least 1")
+	} else if opts.ResetHostDown < 1 {
+		panic("reset-host-down must be at least 1")
+	}
+
 	if _, err := mail.ParseAddress(opts.SMTPFrom); opts.SMTPFrom != "" && err != nil {
 		panic("smtp-from is not a valid mail address")
 	} else if _, err := mail.ParseAddress(opts.SMTPTo); opts.SMTPFrom != "" && err != nil {
