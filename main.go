@@ -25,6 +25,7 @@ const version = "1.0"
 const (
 	returnOk = iota
 	returnHelp
+	returnSignal
 )
 
 var opts struct {
@@ -56,7 +57,6 @@ func checkArguments() {
 		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
 			panic(err)
 		} else {
-			fmt.Printf("%+v\n", opts)
 			p.WriteHelp(os.Stdout)
 
 			os.Exit(returnHelp)
@@ -70,23 +70,19 @@ func checkArguments() {
 	}
 }
 
-func sendMail() {
+func sendMail(subject string, message string) error {
 	if opts.SMTP == "" {
-		return
+		return fmt.Errorf("no SMTP server defined")
 	}
 
 	c, err := smtp.Dial(opts.SMTP)
 	if err != nil {
-		v("Cannot open SMTP connection: %v\n", err)
-
-		return
+		return fmt.Errorf("cannot open SMTP connection: %v", err)
 	}
 
 	if opts.SMTPTLS {
 		if err := c.StartTLS(&tls.Config{InsecureSkipVerify: opts.SMTPSkipCertificateVerify}); err != nil {
-			v("Cannot start SMTP TLS: %v\n", err)
-
-			return
+			return fmt.Errorf("cannot start SMTP TLS: %v", err)
 		}
 	}
 
@@ -95,9 +91,7 @@ func sendMail() {
 
 	wc, err := c.Data()
 	if err != nil {
-		v("Cannot open Data writer: %v\n", err)
-
-		return
+		return fmt.Errorf("cannot open Data writer: %v", err)
 	}
 
 	defer wc.Close()
@@ -105,48 +99,48 @@ func sendMail() {
 	buf := bytes.NewBufferString(`Return-path: <` + opts.SMTPFrom + `>
 From: ` + opts.SMTPFrom + `
 To: ` + opts.SMTPTo + `
-Subject: ` + opts.Host + ` is down
+Subject: ` + subject + `
 Content-Transfer-Encoding: 7Bit
 Content-Type: text/plain; charset="us-ascii"
 
-` + opts.Host + ` is not reachable via ping
+` + message + `
 `)
 
 	if _, err = buf.WriteTo(wc); err != nil {
-		v("Cannot write mail body: %v\n", err)
+		return fmt.Errorf("cannot write mail body: %v", err)
 	}
 
-	v("Mail sent\n")
+	return nil
 }
 
 func v(format string, a ...interface{}) {
 	if opts.Verbose {
-		fmt.Fprintf(os.Stderr, format, a...)
+		fmt.Fprintf(os.Stderr, format+"\n", a...)
 	}
 }
 
 func main() {
 	checkArguments()
 
-	sig := make(chan os.Signal, 1)
+	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
 		s := <-sig
-		v("Caught signal \"%v\", will exit now\n", s)
+		v("caught signal \"%v\", will exit now", s)
 
-		os.Exit(returnOk)
+		os.Exit(returnSignal)
 	}()
 
 	var sentMail = false
 	var errors uint64
 
 	for {
-		var cmd = exec.Command("ping", []string{"-w", "1", "-c", "1", opts.Host}...)
+		var cmd = exec.Command("ping", "-w", "1", "-c", "1", opts.Host)
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			v("Ping to %s failed: %v\n", opts.Host, err)
+			v("ping to %s failed: %v", opts.Host, err)
 		}
 
 		if strings.Contains(string(out), "1 received") {
@@ -155,8 +149,6 @@ func main() {
 			if sentMail && errors <= opts.ResetHostDown {
 				errors = 0
 				sentMail = false
-
-				v("Reset mail sent opts.\n")
 			}
 		} else {
 			errors++
@@ -164,10 +156,12 @@ func main() {
 			if errors >= opts.MaxErrors {
 				errors = 0
 
-				v("Reached error count\n")
+				v("reached error count")
 
 				if !sentMail {
-					sendMail()
+					if err := sendMail(opts.Host+" is down", opts.Host+" is not reachable via ping"); err != nil {
+						v("Cannot send mail %v", err)
+					}
 
 					sentMail = true
 				}
