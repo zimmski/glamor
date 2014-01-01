@@ -38,6 +38,7 @@ var opts struct {
 	SMTPTLS                   bool   `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
 	SMTPTo                    string `long:"smtp-to" description:"To-mail address"`
 	Verbose                   bool   `long:"verbose" description:"Do verbose output"`
+	Version                   bool   `long:"version" description:"Print the version of this program"`
 }
 
 func checkArguments() {
@@ -46,6 +47,12 @@ func checkArguments() {
 	p.AddGroup("Glamor arguments", "", &opts)
 
 	if _, err := p.ParseArgs(os.Args); err != nil {
+		if opts.Version {
+			fmt.Printf("Glamor v%s\n", version)
+
+			os.Exit(returnOk)
+		}
+
 		if e, ok := err.(*flags.Error); !ok || e.Type != flags.ErrHelp {
 			panic(err)
 		} else {

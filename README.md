@@ -35,10 +35,11 @@ The following CLI arguments can be used:
       --reset-host-down=              How many pings have to be successful in order to reset the host down status (20)
       --smtp=                         The SMTP server + port for sending report mails
       --smtp-from=                    From-mail address
-      --smtp-skip-certificate-verify  Do not verify the SMTP certificate (false)
-      --smtp-tls                      Use TLS for the SMTP connection (false)
+      --smtp-skip-certificate-verify  Do not verify the SMTP certificate
+      --smtp-tls                      Use TLS for the SMTP connection
       --smtp-to=                      To-mail address
-      --verbose                       Do verbose output (false)
+      --verbose                       Do verbose output
+      --version                       Print the version of this program
 
   -h, --help                          Show this help message
 ```
