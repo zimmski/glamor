@@ -1,4 +1,4 @@
-// Copyright 2013 The glamor authors.
+// Copyright 2013-2014 The Glamor authors.
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
@@ -26,6 +26,11 @@ const (
 	returnOk = iota
 	returnHelp
 	returnSignal
+)
+
+const (
+	statusUp = iota
+	statusDown
 )
 
 var opts struct {
@@ -132,8 +137,9 @@ func main() {
 		os.Exit(returnSignal)
 	}()
 
-	var sentMail = false
-	var errors uint64
+	var status byte
+	var down uint64
+	var up uint64
 
 	for {
 		var cmd = exec.Command("ping", "-w", "1", "-c", "1", opts.Host)
@@ -144,31 +150,46 @@ func main() {
 		}
 
 		if strings.Contains(string(out), "1 received") {
-			errors--
+			if status == statusDown {
+				up++
 
-			if opts.SMTP != "" && sentMail && errors <= opts.ResetHostDown {
-				if err := sendMail(opts.Host+" is up", opts.Host+" is reachable again via ping"); err != nil {
-					v("Cannot send mail: %v", err)
+				if up >= opts.ResetHostDown {
+					down = 0
+					up = 0
+
+					status = statusUp
+
+					v("host is up")
+
+					if opts.SMTP != "" {
+						if err := sendMail(opts.Host+" is up", opts.Host+" is reachable again via ping"); err != nil {
+							v("Cannot send mail: %v", err)
+						}
+					}
 				}
-
-				errors = 0
-				sentMail = false
+			} else {
+				down = 0
 			}
 		} else {
-			errors++
+			down++
 
-			if errors >= opts.MaxErrors {
-				errors = 0
+			if status == statusUp {
+				if down >= opts.MaxErrors {
+					down = 0
+					up = 0
 
-				v("reached error count")
+					status = statusDown
 
-				if opts.SMTP != "" && !sentMail {
-					if err := sendMail(opts.Host+" is down", opts.Host+" is not reachable via ping"); err != nil {
-						v("Cannot send mail: %v", err)
+					v("host is down")
+
+					if opts.SMTP != "" {
+						if err := sendMail(opts.Host+" is down", opts.Host+" is not reachable via ping"); err != nil {
+							v("Cannot send mail: %v", err)
+						}
 					}
-
-					sentMail = true
 				}
+			} else {
+				up = 0
 			}
 		}
 
