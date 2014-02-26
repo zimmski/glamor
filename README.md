@@ -33,6 +33,7 @@ The following CLI arguments can be used:
       --interval=                     Ping interval in seconds (60)
       --max-down=                     How many pings must fail (in a row) before the host status is down (5)
       --max-up=                       How many pings must succeed (in a row) before the host status is up again (20)
+      --ping-packet-size=             Packet size of one ping. Minimum is 64 bytes maximum is 65535 bytes (64)
       --smtp=                         The SMTP server + port for sending report mails
       --smtp-from=                    From-mail address
       --smtp-skip-certificate-verify  Do not verify the SMTP certificate

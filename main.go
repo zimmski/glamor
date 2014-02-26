@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -46,6 +47,7 @@ var opts struct {
 	Interval                  uint64   `long:"interval" default:"60" description:"Ping interval in seconds"`
 	MaxDown                   uint64   `long:"max-down" default:"5" description:"How many pings must fail (in a row) before the host status is down"`
 	MaxUp                     uint64   `long:"max-up" default:"20" description:"How many pings must succeed (in a row) before the host status is up again"`
+	PingPacketSize            int      `long:"ping-packet-size" default:"64" description:"Packet size of one ping. Minimum is 64 bytes maximum is 65535 bytes"`
 	SMTP                      string   `long:"smtp" description:"The SMTP server + port for sending report mails"`
 	SMTPFrom                  string   `long:"smtp-from" description:"From-mail address"`
 	SMTPSkipCertificateVerify bool     `long:"smtp-skip-certificate-verify" description:"Do not verify the SMTP certificate"`
@@ -84,6 +86,10 @@ func checkArguments() {
 		panic("max-up must be at least 1")
 	}
 
+	if opts.PingPacketSize < 64 || opts.PingPacketSize > 65535 {
+		panic("ping-packet-size must be in range of [64,65535]")
+	}
+
 	if _, err := mail.ParseAddress(opts.SMTPFrom); opts.SMTPFrom != "" && err != nil {
 		panic("smtp-from is not a valid mail address")
 	}
@@ -98,7 +104,7 @@ func checkArguments() {
 func checkHost(wg *sync.WaitGroup, host *host) {
 	defer wg.Done()
 
-	var cmd = exec.Command("ping", "-w", "1", "-c", "1", host.name)
+	var cmd = exec.Command("ping", "-w", "1", "-c", "1", "-s", strconv.Itoa(opts.PingPacketSize-8), host.name)
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
