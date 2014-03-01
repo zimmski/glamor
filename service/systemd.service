@@ -1,0 +1,10 @@
+[Unit]
+Description=Glamor ping agent
+After=local-fs.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/glamor --host google.com
+
+[Install]
+WantedBy=multi-user.target
