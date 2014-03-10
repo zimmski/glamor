@@ -29,6 +29,7 @@ go install github.com/zimmski/glamor
 The following CLI arguments can be used:
 
 ```
+      --config=                       INI config file
       --host=                         A host to ping
       --interval=                     Ping interval in seconds (60)
       --max-down=                     How many pings must fail (in a row) before the host status is down (5)
@@ -63,6 +64,28 @@ Some example arguments for Glamor:
 
 * Monitor github.com and send a mail via TLS connection but ignore “invalid” certificates
   <pre><code>glamor --host github.com --smtp localhost:25 --smtp-from monitoring@fake.domain --smtp-to guard@fake.domain --smtp-tls --smtp-skip-certificate-verify</code></pre>
+
+## INI config file
+
+All Glamor arguments can be definied with an INI config file specified through the <code>--config</code> CLI argument. An INI config file could for example look like this.
+
+```ini
+Host = github.com
+Interval = 60
+MaxDown = 5
+MaxUp = 20
+PingPacketSize = 64
+
+SMTP = localhost:25
+SMTPFrom = monitoring@fake.domain
+SMTPTo = guard@fake.domain
+SMTPTLS = true
+SMTPSkipCertificateVerify = true
+
+Verbose = true
+```
+
+Arguments defined in an INI config file are overwritten by CLI arguments.
 
 ## Can I make some feature requests?
 

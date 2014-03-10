@@ -43,24 +43,36 @@ type host struct {
 }
 
 var opts struct {
-	Host                      []string `long:"host" description:"A host to ping" required:"true"`
-	Interval                  uint64   `long:"interval" default:"60" description:"Ping interval in seconds"`
-	MaxDown                   uint64   `long:"max-down" default:"5" description:"How many pings must fail (in a row) before the host status is down"`
-	MaxUp                     uint64   `long:"max-up" default:"20" description:"How many pings must succeed (in a row) before the host status is up again"`
-	PingPacketSize            int      `long:"ping-packet-size" default:"64" description:"Packet size of one ping. Minimum is 64 bytes maximum is 65535 bytes"`
-	SMTP                      string   `long:"smtp" description:"The SMTP server + port for sending report mails"`
-	SMTPFrom                  string   `long:"smtp-from" description:"From-mail address"`
-	SMTPSkipCertificateVerify bool     `long:"smtp-skip-certificate-verify" description:"Do not verify the SMTP certificate"`
-	SMTPTLS                   bool     `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
-	SMTPTo                    []string `long:"smtp-to" description:"A To-mail address"`
-	Verbose                   bool     `long:"verbose" description:"Do verbose output"`
-	Version                   bool     `long:"version" description:"Print the version of this program"`
+	Config                    func(s string) error `long:"config" description:"INI config file"`
+	Host                      []string             `long:"host" description:"A host to ping" required:"true"`
+	Interval                  uint64               `long:"interval" default:"60" description:"Ping interval in seconds"`
+	MaxDown                   uint64               `long:"max-down" default:"5" description:"How many pings must fail (in a row) before the host status is down"`
+	MaxUp                     uint64               `long:"max-up" default:"20" description:"How many pings must succeed (in a row) before the host status is up again"`
+	PingPacketSize            int                  `long:"ping-packet-size" default:"64" description:"Packet size of one ping. Minimum is 64 bytes maximum is 65535 bytes"`
+	SMTP                      string               `long:"smtp" description:"The SMTP server + port for sending report mails"`
+	SMTPFrom                  string               `long:"smtp-from" description:"From-mail address"`
+	SMTPSkipCertificateVerify bool                 `long:"smtp-skip-certificate-verify" description:"Do not verify the SMTP certificate"`
+	SMTPTLS                   bool                 `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
+	SMTPTo                    []string             `long:"smtp-to" description:"A To-mail address"`
+	Verbose                   bool                 `long:"verbose" description:"Do verbose output"`
+	Version                   bool                 `long:"version" description:"Print the version of this program"`
+
+	configFile string
 }
 
 func checkArguments() {
 	p := flags.NewNamedParser("glamor", flags.HelpFlag)
 	p.ShortDescription = "A daemon for monitoring hosts via ICMP echo request (ping)"
-	p.AddGroup("Glamor arguments", "", &opts)
+
+	opts.Config = func(s string) error {
+		ini := flags.NewIniParser(p)
+
+		opts.configFile = s
+
+		return ini.ParseFile(s)
+	}
+
+	p.AddGroup("Glamor", "Glamor arguments", &opts)
 
 	if _, err := p.ParseArgs(os.Args); err != nil {
 		if opts.Version {
