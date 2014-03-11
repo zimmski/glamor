@@ -43,7 +43,8 @@ type host struct {
 }
 
 var opts struct {
-	Config                    func(s string) error `long:"config" description:"INI config file"`
+	Config                    func(s string) error `long:"config" description:"INI config file" no-ini:"true"`
+	ConfigWrite               string               `long:"config-write" description:"Write all arguments to an INI config file and exit" no-ini:"true"`
 	Host                      []string             `long:"host" description:"A host to ping" required:"true"`
 	Interval                  uint64               `long:"interval" default:"60" description:"Ping interval in seconds"`
 	MaxDown                   uint64               `long:"max-down" default:"5" description:"How many pings must fail (in a row) before the host status is down"`
@@ -55,7 +56,7 @@ var opts struct {
 	SMTPTLS                   bool                 `long:"smtp-tls" description:"Use TLS for the SMTP connection"`
 	SMTPTo                    []string             `long:"smtp-to" description:"A To-mail address"`
 	Verbose                   bool                 `long:"verbose" description:"Do verbose output"`
-	Version                   bool                 `long:"version" description:"Print the version of this program"`
+	Version                   bool                 `long:"version" description:"Print the version of this program" no-ini:"true"`
 
 	configFile string
 }
@@ -110,6 +111,14 @@ func checkArguments() {
 		if _, err := mail.ParseAddress(m); m == "" || err != nil {
 			panic(fmt.Sprintf("smtp-to \"%s\" is not a valid mail address", m))
 		}
+	}
+
+	if opts.ConfigWrite != "" {
+		ini := flags.NewIniParser(p)
+
+		ini.WriteFile(opts.ConfigWrite, flags.IniIncludeComments)
+
+		os.Exit(returnOk)
 	}
 }
 
