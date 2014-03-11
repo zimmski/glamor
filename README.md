@@ -30,6 +30,7 @@ The following CLI arguments can be used:
 
 ```
       --config=                       INI config file
+      --config-write=                 Write all arguments to an INI config file and exit
       --host=                         A host to ping
       --interval=                     Ping interval in seconds (60)
       --max-down=                     How many pings must fail (in a row) before the host status is down (5)
