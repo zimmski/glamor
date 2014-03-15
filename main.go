@@ -116,7 +116,7 @@ func checkArguments() {
 	if opts.ConfigWrite != "" {
 		ini := flags.NewIniParser(p)
 
-		ini.WriteFile(opts.ConfigWrite, flags.IniIncludeComments)
+		ini.WriteFile(opts.ConfigWrite, flags.IniIncludeComments|flags.IniIncludeDefaults|flags.IniCommentDefaults)
 
 		os.Exit(returnOk)
 	}
