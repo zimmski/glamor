@@ -21,8 +21,3 @@ _testmain.go
 
 *.exe
 
-# editors and IDEs
-
-glamor.sublime-project
-glamor.sublime-workspace
-
