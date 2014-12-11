@@ -7,6 +7,7 @@ fmt:
 install:
 	go install github.com/zimmski/glamor
 lint:
-	golint .
+	errcheck github.com/zimmski/glamor/...
+	golint ./...
 	go tool vet -all=true -v=true .
 

@@ -73,7 +73,9 @@ func checkArguments() {
 		return ini.ParseFile(s)
 	}
 
-	p.AddGroup("Glamor", "Glamor arguments", &opts)
+	if _, err := p.AddGroup("Glamor", "Glamor arguments", &opts); err != nil {
+		panic(err)
+	}
 
 	if _, err := p.ParseArgs(os.Args); err != nil {
 		if opts.Version {
@@ -116,7 +118,9 @@ func checkArguments() {
 	if opts.ConfigWrite != "" {
 		ini := flags.NewIniParser(p)
 
-		ini.WriteFile(opts.ConfigWrite, flags.IniIncludeComments|flags.IniIncludeDefaults|flags.IniCommentDefaults)
+		if err := ini.WriteFile(opts.ConfigWrite, flags.IniIncludeComments|flags.IniIncludeDefaults|flags.IniCommentDefaults); err != nil {
+			panic(err)
+		}
 
 		os.Exit(returnOk)
 	}
@@ -197,9 +201,13 @@ func sendMail(subject string, message string) error {
 		}
 	}
 
-	c.Mail(opts.SMTPFrom)
+	if err := c.Mail(opts.SMTPFrom); err != nil {
+		panic(err)
+	}
 	for _, m := range opts.SMTPTo {
-		c.Rcpt(m)
+		if err := c.Rcpt(m); err != nil {
+			panic(err)
+		}
 	}
 
 	wc, err := c.Data()
@@ -207,7 +215,11 @@ func sendMail(subject string, message string) error {
 		return fmt.Errorf("cannot open Data writer: %v", err)
 	}
 
-	defer wc.Close()
+	defer func() {
+		if err := wc.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	buf := bytes.NewBufferString(`Return-path: <` + opts.SMTPFrom + `>
 From: ` + opts.SMTPFrom + `
